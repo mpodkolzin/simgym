@@ -52,6 +52,45 @@ The static output lands in `dist/` and can be hosted anywhere.
 
 Columns you don't draw over are exported with an empty value.
 
+## Architecture
+
+`main.ts` is the imperative shell: it owns the DOM and drives a single
+`recompute()` on every change. The stroke lives in `plot.ts` as one Y-fraction per
+pixel column (so a drawing is always a function of X); `sampling.ts` and `export.ts`
+are pure transforms over it.
+
+```mermaid
+flowchart TD
+    subgraph controls["Controls (main.ts)"]
+        C["start · duration · interval · Y min/max"]
+    end
+    subgraph plot["PlotCanvas (plot.ts)"]
+        B["column buffer<br/>Float32Array: one yFrac per pixel column"]
+    end
+
+    C -->|readConfig| CFG["AxisConfig"]
+    Pointer["pointer drag"] -->|"fillColumns (interpolated)"| B
+
+    CFG --> R{{"recompute() — main.ts"}}
+    B  -->|yFracAtXFrac| R
+
+    R -->|"sample()"| S["Sample[]<br/>t · iso · value|null"]
+    R -->|buildTicks| T["x/y Tick[]"]
+
+    S --> TABLE["sample table"]
+    S --> MARK["canvas markers"]
+    T --> plot
+    MARK --> plot
+
+    S -->|"toCSV / toJSON → download"| FILE["CSV / JSON file"]
+
+    classDef pure fill:#132,stroke:#5c8;
+    class S,T pure;
+```
+
+A resize reallocates the column buffer (its length is the plot's pixel width) and
+therefore **clears the current sketch**.
+
 ## Project layout
 
 | File | Role |
